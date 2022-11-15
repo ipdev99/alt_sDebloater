@@ -1,59 +1,120 @@
 #!/system/bin/sh
 
-# Installation script customize.sh for Magisk Module Systemless Debloater (REPLACE).
-# XDA thread: https://forum.xda-developers.com/mi-9t/how-to/magisk-module-systemless-debloater-t4180083
-# GitHub source: https://github.com/zgfg/SystemlessDebloater
-# Module debloates /system, /system_ext, /product, /vendor and /india apps by searching (at the time of module installation) and listing their paths to the Magisk Module Installer REPLACE variable.
-# Magisk then creates local system tree that will be (systemlessly) overlaid into the /system at every (re)boot.
-# It can be used for any Android - just add/remove your unwanted Stock app names to /Download/SystemlessDebloaterList.sh script on Internal memory, (re)install the module and reboot.
-# Log will be saved to /Download/SystemlessDebloater.log also to Internal memory.
-# Before debloating the apps, from Settings/Applications, Uninstall (updates) and Clear Data for them!
-# Copyright (c) zgfg @ xda, 2020-2022
+# Installation (customize.sh) script for Magisk Module Systemless Debloater (REPLACE).
+# Copyright (c) zgfg @ xda-developers, 2020-2022
 
-# Magisk Module Installer variable
+
+### Preset Magisk Variables
+## TMPDIR (path): a place where you can temporarily store files.
+## MODPATH (path): the path where your module files should be installed.
+
+## Magisk Module Installer variable
 REPLACE=""
 
-# Module's folder
+## Set variables
+# DATE=$(date '+%Y%m%d')
+# DATE=$(date '+%Y%m%d_%H%M')
+TIME=$(date '+%H%M')
 LogFolder=/storage/emulated/0/Download
-
-# Alternative path to Internal memory
 # LogFolder=/sdcard/Download
-
-# Module's version
 MyVersion=v1.5.0
+MyVcode=150
+
+## Set functions
+
+convert_config_file(){
+	echo "Input debloat list file:" | tee -a $LogFile
+	echo " "$UserConfg | tee -a $LogFile
+	echo "" | tee -a $LogFile
+
+	sed -e '/^#/d' -e 's/#.*//g' -e 's/\"//g' -e 's/[ \t ]//g' -e '/^\s*$/d' $UserConfg > $TMPDIR/tmp_config
+
+	if grep -q 'VerboseLog' $TMPDIR/tmp_config; then
+		echo "VerboseLog=\"true\"" >> $DebloatListFile
+		sed -i -e '/VerboseLog/d' $TMPDIR/tmp_config
+		echo "" >> $DebloatListFile
+	fi
+
+	if grep -q 'MultiDebloat' $TMPDIR/tmp_config; then
+		echo "MultiDebloat=\"true\"" >> $DebloatListFile
+		sed -i -e '/MultiDebloat/d' $TMPDIR/tmp_config
+		echo "" >> $DebloatListFile
+	fi
+
+	echo "DebloatList=\"" >> $DebloatListFile
+	while read i; do
+		echo $i >> $DebloatListFile
+	done < $TMPDIR/tmp_config
+	echo "\"" >> $DebloatListFile
+	rm $TMPDIR/tmp_config
+}
+
+example_config(){
+	echo " ! No configuration file found." | tee -a $LogFile
+	echo "  Please add a configuration file and try again."
+
+	cp $MODPATH/sDebloater_example $LogFolder/
+
+	if [ -f "$LogFolder"/sDebloater_example ]; then
+		echo ""
+		echo " Example configuration file saved as :"
+		echo "  "$LogFolder/sDebloater_example
+	fi
+	echo ""
+}
+
+      ### find /system/app/ -type f | grep -o '[^/]*$' | sed 's/\.apk//g'; ## Started with this command. Improved with the following command.
+      ### The updated command should return only the apk file name, and sorted into alphabetical order. Not sure if this will work with multiple calls.
+      ### It will put each directory in order.. Not sure if run as a function what will happen.??
+      ### More than likely have to push the output to a temp file, then sort and cat the temp file to an example config file.
+      # find /system/app/ -type f | grep -o '[^/]*.apk$' | sed 's/\.apk//g' | sort;
+      # find /system/priv-app/ -type f | grep -o '[^/]*.apk$' | sed 's/\.apk//g' | sort;
+      # find /vendor/app/ -type f | grep -o '[^/]*.apk$' | sed 's/\.apk//g' | sort;
+
+# device_sys_installed_apps(){
+# 	SysApp="system/app system/priv-app vendor/app"
+# 	for i in $SysApp; do
+# 		if [ -d /"$i" ]; then
+# 			find /"$i"/ -type f | grep -o '[^/]*.apk$' | sed 's/\.apk//g' | sort;
+# 		fi
+# 	done
+# }
 
 
-# Log file
-LogFile=$LogFolder/SystemlessDebloater.log
-PrintLine="Magisk Module Systemless Debloater (REPLACE) $MyVersion"
-echo "$PrintLine log file." > $LogFile
-echo 'Copyright (c) zgfg @ xda, 2020-2022' >> $LogFile
+## Set additional variables
+DebloatListFile=$TMPDIR/sDebloater_list.sh
+# LogFile=$LogFolder/sDebloater-"$DATE".log
+LogFile=$LogFolder/sDebloater-"$MyVcode"-"$TIME".log
+
+
+# Start log file
+echo "Magisk Module Systemless Debloater (REPLACE) "$MyVersion > $LogFile
+echo "Copyright (c) zgfg @ xda-developers, 2020-2022" >> $LogFile
 echo "Installation time: $(date +%c)" >> $LogFile
-echo '' >> $LogFile
+echo "" >> $LogFile
 
 # Log system info
-Prop=$(getprop ro.build.version.release)
-PrintLine='Android '$Prop
-Prop=$(getprop ro.build.system_root_image)
-if [ ! -z "$Prop" ] && [ "$Prop" ]
-then
+## Force SDK32 to show as 12L instead of 12.
+if [ "$(getprop ro.build.version.sdk)" -eq 32 ]; then
+    PrintLine='Android 12L'
+else
+    PrintLine='Android '$(getprop ro.build.version.release)
+fi
+
+if [ "$(getprop ro.build.system_root_image)" ]; then
 	PrintLine=$PrintLine' SAR'
 fi
-Prop=$(getprop ro.build.ab_update)
-if [ ! -z "$Prop" ] && [ "$Prop" ]
-then
-	PrintLine=$PrintLine' A/B'
+
+if [ "$(getprop ro.build.ab_update)" ]; then
+	PrintLine=$PrintLine' A/B Device'
 fi
-Prop=$(getprop ro.boot.slot_suffix)
-if [ ! -z "$Prop" ] && [ "$Prop" ]
-then
-	PrintLine=$PrintLine" ($Prop)"
+
+if [ "$(getprop ro.boot.slot_suffix)" ]; then
+	PrintLine=$PrintLine" - Current slot is \"$(getprop ro.boot.slot_suffix | sed 's/_//g' | tr [:lower:] [:upper:])\""
 fi
-echo "$PrintLine"
-echo "$PrintLine" >> $LogFile
-PrintLine=$(magisk -c)
-echo "$PrintLine"
-echo "$PrintLine" >> $LogFile
+
+echo "$PrintLine" | tee -a $LogFile
+echo "Magisk :" "$(magisk -c)" | tee -a $LogFile
 echo '' >> $LogFile
 
 # Default SAR mount-points (SAR partitions to search for debloating)
@@ -73,46 +134,70 @@ MultiDebloat="true"
 # Simple example for DebloatList var for the input file SystemlessDebloaterList.sh:
 #DebloatList="EasterEgg CatchLog Traceur wps_lite"
 
-# Input file with a list of app names for debloating
-DebloatListFile=$LogFolder/SystemlessDebloaterList.sh
-PrintLine="Input debloat list file: $DebloatListFile"
-echo "$PrintLine"
-echo "$PrintLine" >> $LogFile
-echo '' >> $LogFile
+# # Input file with a list of app names for debloating
+# DebloatListFile=$LogFolder/SystemlessDebloaterList.sh
+# PrintLine="Input debloat list file: $DebloatListFile"
+# echo "$PrintLine" | tee -a $LogFile
+# # echo "$PrintLine" >> $LogFile
+# echo '' >> $LogFile
 
-# Check if the input list file exists
-if [ -f $DebloatListFile ]
-then
-	# Source the input file
-	. $DebloatListFile
+## Find the user config file.
+
+if [ -f "$LogFolder"/sDebloater_config ]; then
+	UserConfg=$LogFolder/sDebloater_config
+	convert_config_file
+elif [ -f "$LogFolder"/sDebloater-config.txt ]; then
+	UserConfg=$LogFolder/sDebloater-config.txt
+	convert_config_file
+elif [ -f "$LogFolder"/SystemlessDebloaterList.sh ]; then
+	ConfgFile=$LogFolder/SystemlessDebloaterList.sh
+	echo "Input debloat list file:" | tee -a $LogFile
+	echo " "$ConfgFile | tee -a $LogFile
+	cp $ConfgFile $DebloatListFile
+	echo "" | tee -a $LogFile
+# elif [ -f "$MODPATH"/last_debloater_list.sh ]; then
 else
-	# Log error
-	PrintLine='Input file not found, creating a template file!'
-	echo "$PrintLine"
-	echo "$PrintLine" >> $LogFile
-	echo "# Input debloat list $DebloatListFile for Magisk Module Systemless Debloater (REPLACE) $MyVersion" > $DebloatListFile
-	echo '# Before debloating the apps, from Settings/Applications, Uninstall (updates) and Clear Data for them!' >> $DebloatListFile
-	echo "# Systemless Debloater log: $LogFile" >> $DebloatListFile
-	echo '# Copyright (c) zgfg @ xda, 2020-2022' >> $DebloatListFile
-	echo ' ' >> $DebloatListFile
-	echo '# Define a list of Stock apps for debloating:' >> $DebloatListFile
-	echo 'DebloatList=""' >> $DebloatListFile
-	echo ' ' >> $DebloatListFile
-	echo '# MIUI Example (commented out):' >> $DebloatListFile
-	echo '# DebloatList="AnalyticsCore AntHalService BasicDreams ' >> $DebloatListFile
-	echo '# BookmarkProvider CatchLog Chrome CneApp EasterEgg ' >> $DebloatListFile
-	echo '# facebook-appmanager facebook-installer facebook-services ' >> $DebloatListFile
-	echo '# FileExplorer_old GlobalFashiongallery GlobalMinusScreen ' >> $DebloatListFile
-	echo '# Gmail2 GoogleFeedback GooglePartnerSetup HybridAccessory ' >> $DebloatListFile
-	echo '# HybridPlatform IdMipay InMipay Joyose MiBrowserGlobal ' >> $DebloatListFile
-	echo '# MiBrowserGlobalVendor MiCreditInStub MiDrop ' >> $DebloatListFile
-	echo '# MiLinkService2 MiPicks MiPlayClient MiRcs MiRecycle ' >> $DebloatListFile
-	echo '# MiService MiuiBrowserGlobal MiuiBugReport MiuiDaemon ' >> $DebloatListFile
-	echo '# MSA-Global Netflix_activation PartnerBookmarksProvider ' >> $DebloatListFile
-	echo '# PaymentService PhotoTable Stk TouchAssistant Traceur ' >> $DebloatListFile
-	echo '# Turbo uceShimService Velvet VsimCore wps_lite YellowPage ' >> $DebloatListFile
-	echo '# Zman"' >> $DebloatListFile
+	example_config
+	# device_sys_installed_apps
+	echo " This module will not be installed."
+	echo "" | tee -a $LogFile
+    rm -rf $TMPDIR $MODPATH
+    exit 0
 fi
+
+# # Check if the input list file exists
+# if [ -f $DebloatListFile ]
+# then
+# 	# Source the input file
+# 	. $DebloatListFile
+# else
+# 	# Log error
+# 	PrintLine='Input file not found, creating a template file!'
+# 	echo "$PrintLine"
+# 	echo "$PrintLine" >> $LogFile
+# 	echo "# Input debloat list $DebloatListFile for Magisk Module Systemless Debloater (REPLACE) $MyVersion" > $DebloatListFile
+# 	echo '# Before debloating the apps, from Settings/Applications, Uninstall (updates) and Clear Data for them!' >> $DebloatListFile
+# 	echo "# Systemless Debloater log: $LogFile" >> $DebloatListFile
+# 	echo '# Copyright (c) zgfg @ xda, 2020-2022' >> $DebloatListFile
+# 	echo ' ' >> $DebloatListFile
+# 	echo '# Define a list of Stock apps for debloating:' >> $DebloatListFile
+# 	echo 'DebloatList=""' >> $DebloatListFile
+# 	echo ' ' >> $DebloatListFile
+# 	echo '# MIUI Example (commented out):' >> $DebloatListFile
+# 	echo '# DebloatList="AnalyticsCore AntHalService BasicDreams ' >> $DebloatListFile
+# 	echo '# BookmarkProvider CatchLog Chrome CneApp EasterEgg ' >> $DebloatListFile
+# 	echo '# facebook-appmanager facebook-installer facebook-services ' >> $DebloatListFile
+# 	echo '# FileExplorer_old GlobalFashiongallery GlobalMinusScreen ' >> $DebloatListFile
+# 	echo '# Gmail2 GoogleFeedback GooglePartnerSetup HybridAccessory ' >> $DebloatListFile
+# 	echo '# HybridPlatform IdMipay InMipay Joyose MiBrowserGlobal ' >> $DebloatListFile
+# 	echo '# MiBrowserGlobalVendor MiCreditInStub MiDrop ' >> $DebloatListFile
+# 	echo '# MiLinkService2 MiPicks MiPlayClient MiRcs MiRecycle ' >> $DebloatListFile
+# 	echo '# MiService MiuiBrowserGlobal MiuiBugReport MiuiDaemon ' >> $DebloatListFile
+# 	echo '# MSA-Global Netflix_activation PartnerBookmarksProvider ' >> $DebloatListFile
+# 	echo '# PaymentService PhotoTable Stk TouchAssistant Traceur ' >> $DebloatListFile
+# 	echo '# Turbo uceShimService Velvet VsimCore wps_lite YellowPage ' >> $DebloatListFile
+# 	echo '# Zman"' >> $DebloatListFile
+# fi
 
 echo "Verbose logging: $VerboseLog" >> $LogFile
 echo "Multiple search/debloat: $MultiDebloat" >> $LogFile
@@ -132,8 +217,7 @@ NewList="/system $SarMountPointList "
 
 # Search through packages to add potential mount points
 NewList="$SarMountPointList"$'\n'
-for PackageInfo in $Packages
-do
+for PackageInfo in $Packages; do
 	# Extract potential mount point path from PackageInfo
 	Path=$(echo "$PackageInfo" | cut -d '/' -f 2)
 
@@ -149,21 +233,17 @@ BannedList="/data /apex /framework"
 
 # Exclude not valid paths from SarMountPointList
 SarMountPointList=""
-for Path in $NewList
-do
+for Path in $NewList; do
 	# Skip not valid paths
-	for BannedPath in $BannedList
-	do
-		if [ "$Path" = "$BannedPath" ]
-		then
+	for BannedPath in $BannedList; do
+		if [ "$Path" = "$BannedPath" ]; then
 			Path=""
 			break
 		fi
 	done
 
 	# Append to SarMountPointList
-	if [ ! -z "$Path" ]
-	then
+	if [ ! -z "$Path" ]; then
 		SarMountPointList="$SarMountPointList$Path"$'\n'
 	fi
 done
@@ -175,13 +255,10 @@ echo '' >> $LogFile
 
 # List Stock packages
 PackageInfoList=""
-for PackageInfo in $Packages
-do
+for PackageInfo in $Packages; do
 	# Include only applications from SAR mount points
-	for SarMountPoint in $SarMountPointList
-	do
-		if [ -z $(echo "$PackageInfo" | grep '^$SarMountPoint/') ]
-		then
+	for SarMountPoint in $SarMountPointList; do
+		if [ -z $(echo "$PackageInfo" | grep '^$SarMountPoint/') ]; then
 			PrepPackageInfo=$PackageInfo
 
 			# Append to the PackageInfoList
@@ -202,12 +279,10 @@ echo '' >> $LogFile
 
 #Search for Stock apps
 StockAppList=""
-for SarMountPoint in $SarMountPointList
-do
+for SarMountPoint in $SarMountPointList; do
 	NewList=$(find "$SarMountPoint/" -type f -name "*.apk" 2> /dev/null)
 
-	if [ ! -z "$NewList" ]
-	then
+	if [ ! -z "$NewList" ]; then
 		StockAppList="$StockAppList$NewList"$'\n'
 	fi
 done
@@ -218,12 +293,10 @@ done
 
 #Search for previously debloated Stock apps
 ReplacedAppList=""
-for SarMountPoint in $SarMountPointList
-do
+for SarMountPoint in $SarMountPointList; do
 	NewList=$(find "$SarMountPoint/" -type f -name ".replace" 2> /dev/null)
 
-	if [ ! -z "$NewList" ]
-	then
+	if [ ! -z "$NewList" ]; then
 		ReplacedAppList="$ReplacedAppList$NewList"$'\n'
 	fi
 done
@@ -243,9 +316,9 @@ echo '' >> $LogFile
 echo '#!/system/bin/sh' > $ServiceScript
 echo '' >> $ServiceScript
 
-echo "#Magisk Module Systemless Debloater (REPLACE) $MyVersion" >> $ServiceScript
-echo '#Copyright (c) zgfg @ xda, 2020-2022' >> $ServiceScript
-echo "#Installation time: $(date +%c)" >> $ServiceScript
+echo "# Magisk Module Systemless Debloater (REPLACE) $MyVersion" >> $ServiceScript
+echo '# Copyright (c) zgfg @ xda, 2020-2022' >> $ServiceScript
+echo "# Installation time: $(date +%c)" >> $ServiceScript
 echo '' >> $ServiceScript
 
 # Log file for service.sh
@@ -253,8 +326,7 @@ echo 'ServiceLogFolder=/data/local/tmp' >> $ServiceScript
 echo 'ServiceLogFile=$ServiceLogFolder/SystemlessDebloater-service.log' >> $ServiceScript
 echo '' >> $ServiceScript
 
-if [ ! -z "$VerboseLog" ]
-then
+if [ ! -z "$VerboseLog" ]; then
 	echo 'echo "Execution time: $(date +%c)" > $ServiceLogFile' >> $ServiceScript
 	echo 'echo "" >> $ServiceLogFile' >> $ServiceScript
 else
@@ -267,8 +339,7 @@ MODDIR=$(echo "$MODPATH" | sed "s!/modules_update/!/modules/!")
 echo "MODDIR=$MODDIR" >> $ServiceScript
 
 
-if [ ! -z "$VerboseLog" ]
-then
+if [ ! -z "$VerboseLog" ]; then
 	echo 'echo "MODDIR: $MODDIR" >> $ServiceLogFile' >> $ServiceScript
 	echo 'echo "" >> $ServiceLogFile' >> $ServiceScript
 	echo '' >> $ServiceScript
@@ -279,8 +350,7 @@ echo 'DummyApk=$MODDIR/dummy.apk' >> $ServiceScript
 echo 'touch $DummyApk' >> $ServiceScript
 echo '' >> $ServiceScript
 
-if [ ! -z "$VerboseLog" ]
-then
+if [ ! -z "$VerboseLog" ]; then
 	echo 'echo "DummyApk: $DummyApk" >> $ServiceLogFile' >> $ServiceScript
 	echo 'echo "" >> $ServiceLogFile' >> $ServiceScript
 	echo '' >> $ServiceScript
@@ -299,20 +369,16 @@ DebloatList=$(echo "$DebloatList" | sort -bu )
 
 # Iterate through apps for debloating
 echo 'Debloating:' >> $LogFile
-for AppName in $DebloatList
-do
+for AppName in $DebloatList; do
 	AppFound=""
 
 	#Search through previously debloated Stock apps
 	SearchName=/"$AppName"/.replace
 	SearchList=$(echo "$ReplacedAppList" | grep "$SearchName$")
-	for FilePath in $SearchList
-	do
+	for FilePath in $SearchList; do
 		# Break if app already found
-		if [ -z "$MultiDebloat" ]
-		then
-			if [ ! -z "$AppFound" ]
-			then
+		if [ -z "$MultiDebloat" ]; then
+			if [ ! -z "$AppFound" ]; then
 				break
 			fi
 		fi
@@ -321,15 +387,13 @@ do
 		FileName=${FilePath##*/}
 		FolderPath=$(echo "$FilePath" | sed "s,/$FileName$,,")
 
-		if [ ! -z "FolderPath" ]
-		then
+		if [ ! -z "FolderPath" ]; then
 			AppFound="true"
 
 			# Log the full path
 			echo "found: $FilePath" >> $LogFile
 
-			if [ -z $(echo "$FolderPath" | grep '^/system/') ]
-			then
+			if [ -z $(echo "$FolderPath" | grep '^/system/') ]; then
 				# Append to MountList with appended AppName
 				MountList="$MountList$FolderPath/$AppName.apk"$'\n'
 			else
@@ -345,12 +409,9 @@ do
 	#Search through Stock apps
 	SearchName=/"$AppName".apk
 	SearchList=$(echo "$StockAppList" | grep "$SearchName$")
-	for FilePath in $SearchList
-	do
-		if [ -z "$MultiDebloat" ]
-		then
-			if [ ! -z "$AppFound" ]
-			then
+	for FilePath in $SearchList; do
+		if [ -z "$MultiDebloat" ]; then
+			if [ ! -z "$AppFound" ]; then
 				break
 			fi
 		fi
@@ -360,8 +421,7 @@ do
 		PackageName=""
 
 		# Extract package name
-		if [ ! -z "$PackageInfo" ]
-		then
+		if [ ! -z "$PackageInfo" ]; then
 			PackageName=$(echo "$PackageInfo" | sed "s!^$FilePath=!!")
 			PackageName="($PackageName) "
 		fi
@@ -370,15 +430,13 @@ do
 		FileName=${FilePath##*/}
 		FolderPath=$(echo "$FilePath" | sed "s,/$FileName$,,")
 
-		if [ ! -z "FolderPath" ]
-		then
+		if [ ! -z "FolderPath" ]; then
 			AppFound="true"
 
 			# Log the full path and package name
 			echo "found: $FilePath $PackageName" >> $LogFile
 
-			if [ -z $(echo "$FolderPath" | grep '^/system/') ]
-			then
+			if [ -z $(echo "$FolderPath" | grep '^/system/') ]; then
 				# Append to MountList
 				MountList="$MountList$FilePath"$'\n'
 			else
@@ -391,8 +449,7 @@ do
 		fi
 	done
 
-	if [ -z "$AppFound" ]
-	then
+	if [ -z "$AppFound" ]; then
 		# Log app name if not found
 		PrintLine="$AppName --- app not found!"
 		echo "$PrintLine"
@@ -401,8 +458,7 @@ do
 done
 echo '' >> $LogFile
 
-if [ -z "$REPLACE" ]
-then
+if [ -z "$REPLACE" ]; then
 	PrintLine="No app for debloating found!"
 	echo "$PrintLine"
 	echo "$PrintLine" >> $LogFile
@@ -428,20 +484,25 @@ echo 'MountList="'"$MountList"$'\n"' >> $LogFile
 echo '' >> $LogFile
 
 # Debloat by mounting in servise.sh
-for MountApk in $MountList
-do
+for MountApk in $MountList; do
 	PrintLine='$MountBind $DummyApk '"$MountApk"
 	echo "$PrintLine" >> $ServiceScript
 done
 
 
 # Log Stock apps and packages
-if [ ! -z "$VerboseLog" ]
-then
+if [ ! -z "$VerboseLog" ]; then
 	echo "Stock apps:"$'\n'"$StockAppList" >> $LogFile
 	echo "Stock packages: $PackageInfoList" >> $LogFile
 fi
 
+
+# Cleanup
+
+## Remove temporary and unnecessary files if they still exist.
+[ -f "$TMPDIR"/tmp_config ] && rm $TMPDIR/tmp_config
+[ -f "$TMPDIR"/sDebloater_list.sh ] && rm $TMPDIR/sDebloater_list.sh
+[ -f "$MODPATH"/sDebloater_example ] && rm $MODPATH/sDebloater_example
 
 # Note for the log file
 echo "Systemless Debloater log: $LogFile"
