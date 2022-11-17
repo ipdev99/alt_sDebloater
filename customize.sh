@@ -3,8 +3,8 @@
 # Installation (customize.sh) script for Magisk Module Systemless Debloater (REPLACE).
 # Copyright (c) zgfg @ xda-developers, 2020-2022
 
-
 ### Preset Magisk Variables
+## API (value): the API [SDK] level.
 ## TMPDIR (path): a place where you can temporarily store files.
 ## MODPATH (path): the path where your module files should be installed.
 
@@ -71,11 +71,13 @@ example_config(){
       # find /system/priv-app/ -type f | grep -o '[^/]*.apk$' | sed 's/\.apk//g' | sort;
       # find /vendor/app/ -type f | grep -o '[^/]*.apk$' | sed 's/\.apk//g' | sort;
 
-# device_sys_installed_apps(){
+# mk_device_example_config(){
+# 	echo '# Example Config File' >$TMPDIR/tmp_example
+# 	echo '' >>$TMPDIR/tmp_example
 # 	SysApp="system/app system/priv-app vendor/app"
 # 	for i in $SysApp; do
 # 		if [ -d /"$i" ]; then
-# 			find /"$i"/ -type f | grep -o '[^/]*.apk$' | sed 's/\.apk//g' | sort;
+# 			find /"$i"/ -type f | grep -o '[^/]*.apk$' | sed 's/\.apk//g' | sort; >>$TMPDIR/tmp_example
 # 		fi
 # 	done
 # }
@@ -95,7 +97,14 @@ echo "" >> $LogFile
 
 # Log system info
 ## Force SDK32 to show as 12L instead of 12.
-if [ "$(getprop ro.build.version.sdk)" -eq 32 ]; then
+# if [ "$(getprop ro.build.version.sdk)" -eq 32 ]; then
+#     PrintLine='Android 12L'
+# else
+#     PrintLine='Android '$(getprop ro.build.version.release)
+# fi
+
+## Force SDK32 to show as 12L instead of 12.
+if [ "$API" -eq 32 ]; then
     PrintLine='Android 12L'
 else
     PrintLine='Android '$(getprop ro.build.version.release)
@@ -109,9 +118,9 @@ if [ "$(getprop ro.build.ab_update)" ]; then
 	PrintLine=$PrintLine' A/B Device'
 fi
 
-if [ "$(getprop ro.boot.slot_suffix)" ]; then
-	PrintLine=$PrintLine" - Current slot is \"$(getprop ro.boot.slot_suffix | sed 's/_//g' | tr [:lower:] [:upper:])\""
-fi
+# if [ "$(getprop ro.boot.slot_suffix)" ]; then
+# 	PrintLine=$PrintLine" - Current slot is \"$(getprop ro.boot.slot_suffix | sed 's/_//g' | tr [:lower:] [:upper:])\""
+# fi
 
 echo "$PrintLine" | tee -a $LogFile
 echo "Magisk :" "$(magisk -c)" | tee -a $LogFile
@@ -130,19 +139,7 @@ VerboseLog="true"
 # Searching for possible several instances of Stock apps for debloating
 MultiDebloat="true"
 
-
-# Simple example for DebloatList var for the input file SystemlessDebloaterList.sh:
-#DebloatList="EasterEgg CatchLog Traceur wps_lite"
-
-# # Input file with a list of app names for debloating
-# DebloatListFile=$LogFolder/SystemlessDebloaterList.sh
-# PrintLine="Input debloat list file: $DebloatListFile"
-# echo "$PrintLine" | tee -a $LogFile
-# # echo "$PrintLine" >> $LogFile
-# echo '' >> $LogFile
-
 ## Find the user config file.
-
 if [ -f "$LogFolder"/sDebloater_config ]; then
 	UserConfg=$LogFolder/sDebloater_config
 	convert_config_file
@@ -158,46 +155,15 @@ elif [ -f "$LogFolder"/SystemlessDebloaterList.sh ]; then
 # elif [ -f "$MODPATH"/last_debloater_list.sh ]; then
 else
 	example_config
-	# device_sys_installed_apps
+	# mk_device_example_config
 	echo " This module will not be installed."
 	echo "" | tee -a $LogFile
     rm -rf $TMPDIR $MODPATH
     exit 0
 fi
 
-# # Check if the input list file exists
-# if [ -f $DebloatListFile ]
-# then
-# 	# Source the input file
-# 	. $DebloatListFile
-# else
-# 	# Log error
-# 	PrintLine='Input file not found, creating a template file!'
-# 	echo "$PrintLine"
-# 	echo "$PrintLine" >> $LogFile
-# 	echo "# Input debloat list $DebloatListFile for Magisk Module Systemless Debloater (REPLACE) $MyVersion" > $DebloatListFile
-# 	echo '# Before debloating the apps, from Settings/Applications, Uninstall (updates) and Clear Data for them!' >> $DebloatListFile
-# 	echo "# Systemless Debloater log: $LogFile" >> $DebloatListFile
-# 	echo '# Copyright (c) zgfg @ xda, 2020-2022' >> $DebloatListFile
-# 	echo ' ' >> $DebloatListFile
-# 	echo '# Define a list of Stock apps for debloating:' >> $DebloatListFile
-# 	echo 'DebloatList=""' >> $DebloatListFile
-# 	echo ' ' >> $DebloatListFile
-# 	echo '# MIUI Example (commented out):' >> $DebloatListFile
-# 	echo '# DebloatList="AnalyticsCore AntHalService BasicDreams ' >> $DebloatListFile
-# 	echo '# BookmarkProvider CatchLog Chrome CneApp EasterEgg ' >> $DebloatListFile
-# 	echo '# facebook-appmanager facebook-installer facebook-services ' >> $DebloatListFile
-# 	echo '# FileExplorer_old GlobalFashiongallery GlobalMinusScreen ' >> $DebloatListFile
-# 	echo '# Gmail2 GoogleFeedback GooglePartnerSetup HybridAccessory ' >> $DebloatListFile
-# 	echo '# HybridPlatform IdMipay InMipay Joyose MiBrowserGlobal ' >> $DebloatListFile
-# 	echo '# MiBrowserGlobalVendor MiCreditInStub MiDrop ' >> $DebloatListFile
-# 	echo '# MiLinkService2 MiPicks MiPlayClient MiRcs MiRecycle ' >> $DebloatListFile
-# 	echo '# MiService MiuiBrowserGlobal MiuiBugReport MiuiDaemon ' >> $DebloatListFile
-# 	echo '# MSA-Global Netflix_activation PartnerBookmarksProvider ' >> $DebloatListFile
-# 	echo '# PaymentService PhotoTable Stk TouchAssistant Traceur ' >> $DebloatListFile
-# 	echo '# Turbo uceShimService Velvet VsimCore wps_lite YellowPage ' >> $DebloatListFile
-# 	echo '# Zman"' >> $DebloatListFile
-# fi
+# Source the input file
+. $DebloatListFile
 
 echo "Verbose logging: $VerboseLog" >> $LogFile
 echo "Multiple search/debloat: $MultiDebloat" >> $LogFile
