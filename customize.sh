@@ -95,15 +95,40 @@ echo "Copyright (c) zgfg @ xda-developers, 2020-2022" >> $LogFile
 echo "Installation time: $(date +%c)" >> $LogFile
 echo "" >> $LogFile
 
-# Log system info
-## Force SDK32 to show as 12L instead of 12.
-# if [ "$(getprop ro.build.version.sdk)" -eq 32 ]; then
-#     PrintLine='Android 12L'
-# else
-#     PrintLine='Android '$(getprop ro.build.version.release)
-# fi
+## Log system info
 
-## Force SDK32 to show as 12L instead of 12.
+# Brand
+if [ "$(getprop ro.product.brand)" ]; then
+    PrintLine=$(getprop ro.product.brand)
+elif [ "$(getprop ro.product.system.brand)" ]; then
+	PrintLine=$(getprop ro.product.system.brand)
+elif [ "$(getprop ro.product.vendor.brand)" ]; then
+	PrintLine=$(getprop ro.product.vendor.brand)
+fi
+
+# Model
+if [ "$(getprop ro.product.model)" ]; then
+    PrintLine=$PrintLine' : '$(getprop ro.product.model)
+elif [ "$(getprop ro.product.vendor.model)" ]; then
+	PrintLine=$PrintLine' : '$(getprop ro.product.vendor.model)
+elif [ "$(getprop ro.product.system.model)" ]; then
+	PrintLine=$PrintLine' : '$(getprop ro.product.system.model)
+fi
+
+# Device
+if [ "$(getprop ro.product.device)" ]; then
+    PrintLine=$PrintLine' ('$(getprop ro.product.device)')'
+elif [ "$(getprop ro.product.system.device)" ]; then
+	PrintLine=$PrintLine' ('$(getprop ro.product.system.device)')'
+elif [ "$(getprop ro.product.vendor.device)" ]; then
+	PrintLine=$PrintLine' ('$(getprop ro.product.vendor.device)')'
+elif [ "$(getprop ro.build.product)" ]; then
+	PrintLine=$PrintLine' ('$(getprop ro.build.product)')'
+fi
+
+echo "$PrintLine" | tee -a $LogFile
+
+## Force API (SDK) 32 to show as 12L instead of 12.
 if [ "$API" -eq 32 ]; then
     PrintLine='Android 12L'
 else
@@ -111,11 +136,11 @@ else
 fi
 
 if [ "$(getprop ro.build.system_root_image)" ]; then
-	PrintLine=$PrintLine' SAR'
+	PrintLine=$PrintLine' (SAR)'
 fi
 
 if [ "$(getprop ro.build.ab_update)" ]; then
-	PrintLine=$PrintLine' A/B Device'
+	PrintLine=$PrintLine' : A/B Device'
 fi
 
 # if [ "$(getprop ro.boot.slot_suffix)" ]; then
